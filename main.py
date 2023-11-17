@@ -5,23 +5,21 @@ import requests
 app = Flask(__name__)
 api = Api(app)
 
-GITHUB_RELEASE_URL = f'https://api.github.com/repos/sophosia/sophosia/releases/latest'
+GITHUB_RELEASE_URL = "https://api.github.com/repos/sophosia/sophosia/releases/latest"
 
 PLATFORMS = [ # platform, extension
-    (('linux-x86_64',), 'amd64.AppImage.tar.gz'),
-    (('darwin-x86_64', 'darwin-aarch64'), 'app.tar.gz'),
-    (('windows-x86_64',), 'x64_en-US.msi.zip'),
+    (("linux-x86_64",), "amd64.AppImage.tar.gz"),
+    (("darwin-x86_64", "darwin-aarch64"), "app.tar.gz"),
+    (("windows-x86_64",), "x64_en-US.msi.zip"),
 ]
-
 
 def get_latest_gh_release() -> dict:
     """
-        repo: username/project-name
         Return format:
         Note darwin-aarch64 is silicon macOS. Supposed to seperate file but assumed that x64 would work due to Rosetta Stone 2
         {
-          "version": "v0.1.0",  (can be any string)
-          "notes": "- Test updater",
+          "version": "v0.1.0",
+          "notes": "Test updater",
           "pub_date": "2022-11-13T03:20:32Z",
           "platforms": {
             "linux-x86_64": {
@@ -48,39 +46,40 @@ def get_latest_gh_release() -> dict:
     except requests.RequestException:
         return {}
     release_response = {
-        'version': release['tag_name'],
-        'notes': release['body'].rstrip('\r\n '),
-        'pub_date': release['published_at'],
-        'platforms': {}
+        "version": release["tag_name"],
+        "notes": release["body"].rstrip("\r\n "),
+        "pub_date": release["published_at"],
+        "platforms": {}
         }
-    for asset in release.get('assets', []):
+    for asset in release.get("assets", []):
         for for_platforms, extension in PLATFORMS:
-            if asset['name'].endswith(extension):
+            if asset["name"].endswith(extension):
                 for platform in for_platforms:
-                    release_response['platforms'][platform] = {**release_response['platforms'].get(platform, {}), 'url': asset['browser_download_url']}
-            elif asset['name'].endswith(f'{extension}.sig'):
+                    release_response["platforms"][platform] = {**release_response["platforms"].get(platform, {}), "url": asset["browser_download_url"]}
+                    release_response["platforms"][platform] = {**release_response["platforms"].get(platform, {}), "signature": ""}
+            elif asset["name"].endswith(f"{extension}.sig"):
                 try:
-                    sig = requests.get(asset['browser_download_url']).text
+                    sig = requests.get(asset["browser_download_url"]).text
                 except requests.RequestException:
-                    sig = ''
+                    sig = ""
                 for platform in for_platforms:
-                    release_response['platforms'][platform] = {**release_response['platforms'].get(platform, {}), 'signature': sig}
+                    release_response["platforms"][platform] = {**release_response["platforms"].get(platform, {}), "signature": sig}
     return release_response
 
 class UpdateInfo(Resource):
     def get(self, platform: str, current_version: str):
         latest_release = get_latest_gh_release()
         if not latest_release:
-            return '', 204
+            return "", 204
         try:
             # version checks
-            latest_version = latest_release['version']
-            latest_maj, latest_min, latest_patch = latest_version.lstrip('v').split('.')
-            cur_maj, cur_min, cur_patch = current_version.lstrip('v').split('.')
+            latest_version = latest_release["version"]
+            latest_maj, latest_min, latest_patch = latest_version.lstrip("v").split(".")
+            cur_maj, cur_min, cur_patch = current_version.lstrip("v").split(".")
             if cur_maj == latest_maj and cur_min == latest_min and cur_patch == latest_patch:
                 raise ValueError
         except ValueError:
-            return '', 204
+            return "", 204
         return latest_release
 
 api.add_resource(UpdateInfo, "/<platform>/<current_version>")
